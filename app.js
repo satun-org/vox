@@ -243,9 +243,10 @@ function renderModeUi() {
 
   // chip: ข้อความ = โหมดที่ใช้อยู่, สีจุด = สถานะเชื่อมต่อ
   dom.modeChipText.textContent = mode === 'lan' ? '📡 LAN' : '🌐 ONLINE';
-  if (!st || st.state === 'connected') {
+  if (st && st.state === 'connected') {
     dom.modeChipDot.style.backgroundColor = 'var(--color-green)';
-  } else if (st.state === 'connecting' || st.state === 'reconnecting') {
+  } else if (!st || st.state === 'connecting' || st.state === 'reconnecting') {
+    // ยังไม่เคยต่อเลย -> แสดงเหลือง (กำลังเชื่อมต่อ) ห้ามแสดงเขียวมั่วๆ
     dom.modeChipDot.style.backgroundColor = 'var(--color-yellow)';
   } else {
     dom.modeChipDot.style.backgroundColor = 'var(--color-red)';
