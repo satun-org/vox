@@ -1,5 +1,5 @@
 // Service Worker for VOX Push-to-Talk PWA
-const CACHE_NAME = 'vox-ptt-v3';
+const CACHE_NAME = 'vox-ptt-v4';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS_TO_CACHE = [
   './qrcode.js',
   './signaling.js',
   './vendor/mqtt.min.js',
+  './vendor/qrcode.min.js',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png'
