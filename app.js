@@ -89,6 +89,8 @@ const dom = {
   qrUrlText: document.getElementById('qrUrlText'),
 
   modeChip: document.getElementById('modeChip'),
+  btnNetStatus: document.getElementById('btnNetStatus'),
+  netStatusDot: document.getElementById('netStatusDot'),
   modeChipDot: document.getElementById('modeChipDot'),
   modeChipText: document.getElementById('modeChipText'),
   modeModal: document.getElementById('modeModal'),
@@ -271,6 +273,69 @@ function renderModeUi() {
   dom.btnModeOnline.disabled = mode === 'mqtt';
   dom.btnModeLan.disabled = mode === 'lan';
   dom.btnModeAuto.disabled = !forced;
+}
+
+// ---- สถานะอินเทอร์เน็ต (ไอคอนข้างปุ่ม QR) ----
+// navigator.onLine บอกแค่ว่า "มีการเชื่อมต่อเครือข่าย" ไม่ได้แปลว่าเน็ตใช้ได้จริง
+// จึง probe ไปที่ generate_204 (no-cors, เล็กมาก) เพื่อดูว่าออกไปอินเทอร์เน็ตได้จริงไหม
+let netState = 'checking';              // 'online' | 'offline' | 'checking'
+const NET_PROBE_URL = 'https://www.gstatic.com/generate_204';
+
+function renderNetIndicator() {
+  if (!dom.btnNetStatus) return;
+  let color;
+  let label;
+  if (netState === 'online') {
+    color = 'var(--color-green)';
+    label = 'อินเทอร์เน็ต: ใช้ได้';
+  } else if (netState === 'offline') {
+    color = 'var(--color-red)';
+    label = 'ไม่มีอินเทอร์เน็ต — ใช้ระบบสำรอง LAN ได้';
+  } else {
+    color = 'var(--color-yellow)';
+    label = 'กำลังตรวจสอบอินเทอร์เน็ต...';
+  }
+  dom.netStatusDot.style.backgroundColor = color;
+  dom.btnNetStatus.style.color = color;
+  dom.btnNetStatus.title = label;
+  dom.btnNetStatus.setAttribute('aria-label', `สถานะอินเทอร์เน็ต: ${label}`);
+}
+
+async function probeInternet() {
+  if (navigator.onLine === false) {
+    netState = 'offline';
+    renderNetIndicator();
+    return;
+  }
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    await fetch(`${NET_PROBE_URL}?_=${Date.now()}`, {
+      method: 'GET', mode: 'no-cors', cache: 'no-store', signal: ctrl.signal
+    });
+    clearTimeout(timer);
+    netState = 'online';
+  } catch (e) {
+    netState = 'offline';       // ยิงออกไปไม่ถึง = ไม่มีเน็ตจริง (แม้ navigator.onLine จะบอกว่ามี)
+  }
+  renderNetIndicator();
+}
+
+window.addEventListener('online', probeInternet);
+window.addEventListener('offline', () => {
+  netState = 'offline';
+  renderNetIndicator();
+});
+
+renderNetIndicator();            // เริ่มเป็นเหลือง "กำลังตรวจสอบ" ก่อน probe แรกเสร็จ
+probeInternet();
+setInterval(probeInternet, 20000); // ทวนทุก 20 วิ (ตอนนี้มีเน็ตแล้วเน็ตหุบ ก็เห็นทัน)
+
+if (dom.btnNetStatus) {
+  dom.btnNetStatus.addEventListener('click', () => {
+    showToast(dom.btnNetStatus.title);
+    probeInternet();             // แตะ = ตรวจสอบใหม่ทันที
+  });
 }
 
 function connectSignaling() {

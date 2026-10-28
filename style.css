@@ -130,6 +130,24 @@ body {
   fill: currentColor;
 }
 
+/* ตัวแสดงสถานะอินเทอร์เน็ต (ข้างปุ่ม QR) */
+.net-indicator {
+  position: relative;
+  cursor: help;
+}
+
+.net-dot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-secondary);
+  background: var(--color-yellow);
+  transition: background-color 0.2s ease;
+}
+
 /* Channel Bar */
 .channel-bar {
   display: flex;
