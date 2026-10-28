@@ -96,13 +96,17 @@ const dom = {
 let offerQueue = Promise.resolve();
 
 // STUN ICE Servers Configuration for WebRTC
-const rtcConfig = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' }
-  ]
-};
+// โหมด LAN (ไม่มีอินเทอร์เน็ต): ตัด STUN ออก เพราะเครื่องในวงเดียวกันเจอกันได้
+// ผ่าน host candidate อยู่แล้ว — การรอ STUN ที่เข้าไม่ถึงมีแต่จะหน่วงเวลา
+const rtcConfig = VOX.lanMode
+  ? { iceServers: [] }
+  : {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' }
+    ]
+  };
 
 // Show Toast helper
 function showToast(msg) {

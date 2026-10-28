@@ -603,10 +603,183 @@ const VOX = (() => {
     }
   }
 
+  // ---- โหมด LAN (ระบบสำรองไว้ใช้ตอนไม่มีอินเทอร์เน็ต) ----
+  // เมื่อแอปถูกเสิร์ฟจาก lan_server.py บนเครื่องในวง Wi-Fi เดียวกัน
+  // จะคุยกับเซิร์ฟเวอร์นั้นผ่าน WebSocket ที่ /ws แทน MQTT สาธารณะ
+  // ดังนั้นทั้ง signaling และ presence จะทำงานได้โดยไม่ต้องมีเน็ตเลย
+  let forceMqtt = false;     // ลอง LAN แล้วไม่สำเร็จ -> ถอยไปใช้ broker สาธารณะ
+  let localFailures = 0;
+
+  function useLocalSignaling() {
+    if (forceMqtt || typeof location === 'undefined' || !location.host) return false;
+    const q = new URLSearchParams(location.search);
+    if (q.get('sig') === 'mqtt') return false;   // บังคับใช้ broker สาธารณะ
+    if (q.get('sig') === 'lan') return true;     // บังคับใช้ LAN
+    if (location.protocol === 'file:') return false; // เปิดไฟล์ตรงๆ -> เหมือนเดิม
+    const h = (location.hostname || '').toLowerCase();
+    if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]') return true;
+    if (h.endsWith('.local')) return true;
+    if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h)) return true;
+    return !/\.github\.io$/.test(h); // ที่อื่นที่ไม่ใช่ GitHub Pages = เซิร์ฟเวอร์ LAN ของเรา
+  }
+
+  function brokerName() {
+    if (useLocalSignaling()) return 'LAN (ในวงเดียวกัน)';
+    return BROKERS[brokerIndex % BROKERS.length].name;
+  }
+
+  // ---- ตัวแปลง payload: mqtt.js ส่ง Buffer แต่ของ LAN ส่ง JSON ----
+  function encodePayload(payload) {
+    if (typeof payload === 'string') return payload;
+    if (payload instanceof Uint8Array) {         // ข้อความเข้ารหัส (ห้องส่วนตัว)
+      let s = '';
+      for (let i = 0; i < payload.length; i++) s += String.fromCharCode(payload[i]);
+      return { b64: btoa(s) };
+    }
+    if (payload === undefined || payload === null) return '';
+    return String(payload);
+  }
+
+  function decodePayload(payload) {
+    if (payload && typeof payload === 'object' && typeof payload.b64 === 'string') {
+      const bin = atob(payload.b64);
+      const out = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+      return out;
+    }
+    return enc8.encode(typeof payload === 'string' ? payload : '');
+  }
+
+  /**
+   * LocalClient — หน้าตาและพฤติกรรมเหมือน mqtt.connect() ทุกอย่างที่โค้ดใช้
+   * (on/publish/subscribe/unsubscribe/end) แต่วิ่งผ่าน WebSocket ของ lan_server.py
+   * แทนที่จะวิ่งออกไปหา broker ภายนอก
+   */
+  class LocalClient {
+    constructor(opts, onFail) {
+      this.opts = opts || {};
+      this.onFail = onFail || null;
+      this.handlers = {};
+      this.pendingSubs = [];
+      this.outbox = [];
+      this.ended = false;
+      this.sawOpen = false;
+      this.failed = false;
+      this.open();
+    }
+
+    on(type, fn) {
+      (this.handlers[type] = this.handlers[type] || []).push(fn);
+      return this;
+    }
+
+    emit(type, a, b) {
+      (this.handlers[type] || []).slice().forEach((fn) => {
+        try { fn(a, b); } catch (e) { console.error('[Signaling] handler error', type, e); }
+      });
+    }
+
+    fail() {
+      if (this.failed || this.ended) return;
+      this.failed = true;
+      if (this.onFail) { try { this.onFail(); } catch (e) { /* noop */ } }
+    }
+
+    open() {
+      const url = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`;
+      let ws;
+      try {
+        ws = new WebSocket(url);
+      } catch (e) {
+        this.fail();
+        setTimeout(() => this.emit('close'), 0);
+        return;
+      }
+      this.ws = ws;
+      ws.onopen = () => {
+        if (this.ended) { try { ws.close(); } catch (e) { /* noop */ } return; }
+        this.sawOpen = true;
+        // Last Will: เหมือน MQTT — ถ้าขาดการเชื่อมต่อกะทันหัน ให้เซิร์ฟเวอร์แจ้งคนอื่นทันที
+        if (this.opts.will) {
+          this.send({ t: 'will', topic: this.opts.will.topic, payload: encodePayload(this.opts.will.payload) });
+        }
+        this.flush();
+        this.emit('connect');
+      };
+      ws.onmessage = (ev) => this.onMessage(ev.data);
+      ws.onerror = () => this.fail();
+      ws.onclose = () => {
+        if (this.ended) return;
+        this.fail();
+        this.emit('close');
+      };
+    }
+
+    send(obj) {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify(obj));
+        return true;
+      }
+      this.outbox.push(obj);
+      return false;
+    }
+
+    flush() {
+      const queued = this.outbox.splice(0);
+      queued.forEach((obj) => this.send(obj));
+    }
+
+    publish(topic, payload, opts, cb) {
+      const o = opts || {};
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        if (cb) cb(new Error('not connected'));
+        return;
+      }
+      this.send({ t: 'pub', topic, payload: encodePayload(payload), retain: !!o.retain });
+      if (cb) cb(null);
+    }
+
+    subscribe(subs, cb) {
+      const topics = Array.isArray(subs) ? subs : Object.keys(subs || {});
+      this.pendingSubs.push(cb || null);
+      this.send({ t: 'sub', topics });
+    }
+
+    unsubscribe(topics, cb) {
+      const list = Array.isArray(topics) ? topics : Object.keys(topics || {});
+      this.send({ t: 'unsub', topics: list });
+      if (cb) cb(null, []);
+    }
+
+    end() {
+      this.ended = true;
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        // บอกเซิร์ฟเวอร์ว่าปิดแบบตั้งใจ -> ห้ามยิง Last Will (เหมือน MQTT DISCONNECT)
+        this.send({ t: 'bye' });
+        setTimeout(() => { try { this.ws.close(); } catch (e) { /* noop */ } }, 60);
+      } else if (this.ws) {
+        try { this.ws.close(); } catch (e) { /* noop */ }
+      }
+    }
+
+    onMessage(text) {
+      let msg;
+      try { msg = JSON.parse(text); } catch (e) { return; }
+      if (!msg || typeof msg !== 'object') return;
+      if (msg.t === 'msg') {
+        this.emit('message', msg.topic, decodePayload(msg.payload));
+      } else if (msg.t === 'suback') {
+        const cb = this.pendingSubs.shift();
+        if (cb) { try { cb(null, []); } catch (e) { /* noop */ } }
+      }
+      // ready / pong / unsuback: ไม่มีอะไรต้องทำฝั่ง client
+    }
+  }
+
   // ---- connection ----
   function setStatus(state, label) {
     statusLabel = label || '';
-    emit('status', { state, label: statusLabel, broker: BROKERS[brokerIndex % BROKERS.length].name });
+    emit('status', { state, label: statusLabel, broker: brokerName() });
   }
 
   function scheduleReconnect() {
@@ -628,7 +801,9 @@ const VOX = (() => {
 
   function openClient() {
     const gen = ++clientGen;
-    const broker = BROKERS[brokerIndex % BROKERS.length];
+    const local = useLocalSignaling();
+    const broker = local ? { url: 'ws(s)://<host>/ws', name: brokerName() }
+                         : BROKERS[brokerIndex % BROKERS.length];
     setStatus('connecting', `กำลังเชื่อมต่อ ${broker.name}...`);
 
     try {
@@ -650,9 +825,15 @@ const VOX = (() => {
           retain: false
         };
       }
-      client = mqtt.connect(broker.url, opts);
+      client = local
+        ? new LocalClient(opts, () => {
+          // LAN ใช้ไม่ได้ (เช่น เปิด URL ที่ไม่ใช่เซิร์ฟเวอร์ของเรา) -> ถอยไป broker สาธารณะ
+          localFailures += 1;
+          if (localFailures >= 2) forceMqtt = true;
+        })
+        : mqtt.connect(broker.url, opts);
     } catch (e) {
-      console.error('[Signaling] mqtt.connect error:', e);
+      console.error('[Signaling] connect error:', e);
       scheduleReconnect();
       return;
     }
@@ -661,8 +842,9 @@ const VOX = (() => {
       if (gen !== clientGen) return;
       connected = true;
       brokerFailures = 0;
+      localFailures = 0;
       retryDelay = 1000;
-      console.log('[Signaling] connected to', broker.url);
+      console.log('[Signaling] connected to', local ? 'LAN server (/ws)' : broker.url);
       setStatus('connected', `เชื่อมต่อ ${broker.name} แล้ว`);
       if (session) { joined = false; subscribeSession(); }
     });
@@ -733,6 +915,7 @@ const VOX = (() => {
     sendSignal, requestPttStart, requestPttStop, updateName,
     on,
     get connected() { return connected; },
-    get channel() { return session ? session.channel : null; }
+    get channel() { return session ? session.channel : null; },
+    get lanMode() { return useLocalSignaling(); }
   };
 })();
