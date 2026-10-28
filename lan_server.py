@@ -416,6 +416,53 @@ def ensure_cert(cert_path, key_path):
 
 
 # ---------------------------------------------------------------------------
+# --setup: เตรียมระบบอย่างเดียว (ไม่เปิดเซิร์ฟเวอร์) ใช้กับ setup_lan_backup.bat
+# ---------------------------------------------------------------------------
+REQUIRED_FILES = [
+    'index.html', 'app.js', 'style.css', 'signaling.js', 'audio-fx.js',
+    'qrcode.js', 'sw.js', 'manifest.json', 'vendor/mqtt.min.js',
+]
+
+
+def run_setup(args):
+    bar = '=' * 60
+    print(bar)
+    print('  VOX LAN — ตรวจสอบและเตรียมระบบสำรอง')
+    print(bar)
+
+    print('\n  [1/3] ตรวจไฟล์แอป')
+    missing = []
+    for name in REQUIRED_FILES:
+        ok = os.path.isfile(os.path.join(ROOT, name))
+        print(f'        {"OK  " if ok else "ขาด "} {name}')
+        if not ok:
+            missing.append(name)
+    if missing:
+        print(f'\n  ! ขาดไฟล์ {len(missing)} ไฟล์ -> ต้องคัดลอกโฟลเดอร์โปรเจกต์ทั้งหมดมาที่เครื่องนี้')
+        print('    (อย่าลืมโฟลเดอร์ vendor/ และ icons/ ด้วย)')
+        return 1
+
+    print('\n  [2/3] ตรวจ Python')
+    print(f'        OK   Python {sys.version.split()[0]}')
+
+    print('\n  [3/3] เตรียมใบรับรอง HTTPS')
+    if ensure_cert(args.cert, args.key):
+        print('        OK   cert.pem / key.pem พร้อม -> มือถือเปิดไมโครโฟนได้')
+    else:
+        print('        !  ไม่พบ openssl -> จะใช้ HTTP แทน')
+        print('           ผลคือมือถือเครื่องอื่นเปิดได้แต่ใช้ไมโครโฟนไม่ได้')
+        print('           (ถ้าติดตั้ง OpenSSL แล้วรันใหม่ จะสร้างใบรับรองให้เอง)')
+
+    print('')
+    print('  เสร็จแล้ว — ขั้นตอนถัดไป:')
+    print('      1. ดับเบิลคลิก run_lan_server.bat')
+    print('      2. เปิด URL ที่ขึ้นบนจอ จากมือถือในวง Wi-Fi เดียวกัน')
+    print('      3. ข้ามหน้าเตือนใบรับรอง แล้วอนุญาตไมโครโฟน')
+    print('')
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 def main():
@@ -426,7 +473,12 @@ def main():
     ap.add_argument('--key', default=os.path.join(ROOT, 'key.pem'))
     ap.add_argument('--http', action='store_true',
                     help='บังคับใช้ HTTP (ไม่แนะนำ: มือถือจะใช้ไมโครโฟนไม่ได้เพราะไม่ใช่ secure context)')
+    ap.add_argument('--setup', action='store_true',
+                    help='ตรวจไฟล์ + เสร็็จเตรียมใบรับรอง แล้วจบ ไม่เปิดเซิร์ฟเวอร์')
     args = ap.parse_args()
+
+    if args.setup:
+        sys.exit(run_setup(args))
 
     use_tls = not args.http
     if use_tls:
