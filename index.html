@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>VOX Walkie-Talkie PTT</title>
+  
+  <!-- PWA & Mobile Meta Tags -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#10b981">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VOX PTT">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- First-time Audio Activation Modal -->
+  <div class="permission-modal" id="permissionModal">
+    <div class="permission-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+    </div>
+    <h2 class="permission-title">VOX Walkie-Talkie</h2>
+    <p class="permission-desc">แตะปุ่มด้านล่างเพื่อเปิดใช้งานระบบเสียงและไมโครโฟนสำหรับสนทนาแบบ Push-to-Talk เรียลไทม์</p>
+    <button class="btn-primary" id="btnActivateAudio" style="max-width: 260px;">🚀 เริ่มต้นใช้งาน</button>
+  </div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+        </div>
+        <div>
+          <div class="brand-title">VOX PTT</div>
+          <div class="brand-subtitle">MOBILE WALKIE-TALKIE</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn-icon" id="btnQrCode" title="แสดง QR Code สำหรับมือถือ">
+          <svg viewBox="0 0 24 24"><path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm13-2h3v2h-3v-2zm-5 0h2v2h-2v-2zm2 2h2v2h-2v-2zm-2 2h2v2h-2v-2zm4 0h2v2h-2v-2zm0 2h3v2h-3v-2z"/></svg>
+        </button>
+        <button class="btn-icon" id="btnWakeLock" title="เปิด/ปิด การป้องกันจอดับ">
+          <svg viewBox="0 0 24 24" id="wakeLockIcon"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>
+        </button>
+        <button class="btn-icon" id="btnSettings" title="ตั้งค่า">
+          <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Channel Bar -->
+    <div class="channel-bar">
+      <div class="channel-selector" id="btnChannelSelect">
+        <div class="channel-badge" id="netStatusBadge"></div>
+        <span class="channel-name" id="currentChannelLabel">CH-1 ALPHA</span>
+        <svg style="width:14px;height:14px;fill:#9ca3af;" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+      </div>
+      <div class="users-count" id="onlineCountContainer">
+        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        <span id="onlineCountText">1 ออนไลน์</span>
+      </div>
+    </div>
+
+    <!-- Transmission Status Alert Banner -->
+    <div class="status-banner" id="statusBanner">
+      <div class="status-info">
+        <div class="status-dot"></div>
+        <div>
+          <div class="status-text" id="statusTitle">พร้อมใช้งาน (STANDBY)</div>
+          <div class="status-speaker" id="statusSubtitle">ไม่มีผู้ใช้งานส่งสัญญาณ</div>
+        </div>
+      </div>
+      <div class="tx-timer" id="txTimer">00:00</div>
+    </div>
+
+    <!-- Main PTT Section -->
+    <main class="ptt-section">
+      <div class="visualizer-wrapper">
+        <canvas class="visualizer-canvas" id="visualizerCanvas" width="340" height="340"></canvas>
+        <button class="ptt-button" id="pttButton" aria-label="Push To Talk">
+          <svg class="ptt-button-icon" viewBox="0 0 24 24">
+            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+          </svg>
+          <div class="ptt-button-label" id="pttLabel">กดค้างเพื่อพูด</div>
+          <div class="ptt-button-hint" id="pttHint">HOLD TO TALK</div>
+        </button>
+      </div>
+
+      <!-- Mode Controls -->
+      <div class="ptt-controls">
+        <div class="mode-pill active" id="modeHoldPill">
+          <svg viewBox="0 0 24 24"><path d="M13 1.07V9h7c.73 0 1.25.75.97 1.42l-5.33 12.44c-.31.73-1.34.69-1.59-.06L12 16H5c-.73 0-1.25-.75-.97-1.42l5.33-12.44c.31-.73 1.34-.69 1.59.06L13 1.07z"/></svg>
+          <span>กดค้าง (Hold)</span>
+        </div>
+        <div class="mode-pill" id="modeTogglePill">
+          <svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+          <span>แตะสลับ (Toggle)</span>
+        </div>
+      </div>
+    </main>
+
+    <!-- Channel Members Drawer -->
+    <section class="members-drawer">
+      <div class="drawer-header">
+        <div class="drawer-title">สมาชิกในช่องสัญญาณ</div>
+        <div style="font-size:0.75rem; color:var(--text-muted);" id="userCallSignBadge">นามเรียกขาน: ไม่ระบุ</div>
+      </div>
+      <div class="members-list" id="membersList">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">⚙️ ตั้งค่าการใช้งาน</div>
+        <button class="btn-icon" id="btnCloseSettings">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">นามเรียกขาน / ชื่อผู้ใช้ (Call Sign)</label>
+        <input type="text" class="form-input" id="inputCallSign" placeholder="เช่น ALPHA-1, ช่างยนต์ 01" maxlength="20">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">ช่องสัญญาณวิทยุ (Channel)</label>
+        <select class="form-select" id="selectChannel">
+          <option value="CH-1 ALPHA">CH-1 ALPHA (ทั่วไป)</option>
+          <option value="CH-2 BRAVO">CH-2 BRAVO (ทีมช่าง/ปฏิบัติการ)</option>
+          <option value="CH-3 CHARLIE">CH-3 CHARLIE (ประสานงาน)</option>
+          <option value="CH-4 DELTA">CH-4 DELTA (เหตุฉุกเฉิน)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">ระดับเสียงลำโพง (Volume)</label>
+        <input type="range" class="form-range" id="rangeVolume" min="0" max="100" value="85">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">เลือกไมโครโฟน</label>
+        <select class="form-select" id="selectAudioInput">
+          <option value="">ไมโครโฟนเริ่มต้น (Default)</option>
+        </select>
+      </div>
+
+      <button class="btn-primary" id="btnSaveSettings">บันทึกการตั้งค่า</button>
+    </div>
+  </div>
+
+  <!-- Channel Selector Modal -->
+  <div class="modal-overlay" id="channelModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">📻 เปลี่ยนช่องสัญญาณ</div>
+        <button class="btn-icon" id="btnCloseChannel">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <button class="btn-primary" style="background:var(--bg-card);border:1px solid var(--border-color);text-align:left;" data-chan="CH-1 ALPHA">CH-1 ALPHA (ทั่วไป)</button>
+        <button class="btn-primary" style="background:var(--bg-card);border:1px solid var(--border-color);text-align:left;" data-chan="CH-2 BRAVO">CH-2 BRAVO (ปฏิบัติการ)</button>
+        <button class="btn-primary" style="background:var(--bg-card);border:1px solid var(--border-color);text-align:left;" data-chan="CH-3 CHARLIE">CH-3 CHARLIE (ประสานงาน)</button>
+        <button class="btn-primary" style="background:var(--bg-card);border:1px solid var(--border-color);text-align:left;" data-chan="CH-4 DELTA">CH-4 DELTA (เหตุฉุกเฉิน)</button>
+      </div>
+
+      <!-- Private Room with password -->
+      <div style="border-top:1px solid var(--border-color); margin-top:16px; padding-top:14px;">
+        <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">🔒 ห้องส่วนตัว (มีรหัสผ่าน)</div>
+        <input type="text" class="form-input" id="inputPrivateRoom" placeholder="ชื่อห้อง เช่น ทีมช่างA" maxlength="30" style="margin-bottom:8px;">
+        <input type="password" class="form-input" id="inputPrivatePass" placeholder="รหัสผ่าน" maxlength="64" style="margin-bottom:10px;">
+        <button class="btn-primary" id="btnJoinPrivate">เข้าห้องส่วนตัว</button>
+        <div id="privateHint" style="font-size:0.75rem; color:var(--text-muted); margin-top:8px; text-align:center;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QR Code Modal for Mobile Connection -->
+  <div class="modal-overlay" id="qrModal">
+    <div class="modal-content" style="text-align: center;">
+      <div class="modal-header">
+        <div class="modal-title">📱 สแกนเพื่อเปิดบนมือถือ</div>
+        <button class="btn-icon" id="btnCloseQr">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom: 16px;">
+        ใช้กล้องมือถือสแกน QR Code ด้านล่างเพื่อเปิดแอป Walkie-Talkie — ใช้ได้ทุกเครือข่าย ไม่ต้องอยู่ Wi-Fi วงเดียวกันแล้ว
+      </p>
+      <div style="background:#fff; padding:16px; border-radius:16px; display:inline-block; margin-bottom:14px;">
+        <canvas id="qrCanvas" width="220" height="220"></canvas>
+      </div>
+      <div style="font-family:monospace; font-size:0.85rem; background:var(--bg-card); padding:10px 14px; border-radius:8px; border:1px solid var(--border-color); word-break:break-all;" id="qrUrlText">
+        https://...
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">ข้อความแจ้งเตือน</div>
+
+  <!-- Audio elements container for WebRTC incoming streams -->
+  <div id="remoteAudios" style="display:none;"></div>
+
+  <script src="qrcode.js"></script>
+  <script src="audio-fx.js"></script>
+  <script src="vendor/mqtt.min.js"></script>
+  <script src="signaling.js"></script>
+  <script src="app.js"></script>
+  <script>
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => console.log('SW error:', err));
+      });
+    }
+  </script>
+</body>
+</html>

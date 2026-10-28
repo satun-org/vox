@@ -1,0 +1,37 @@
+# Deploy ขึ้น GitHub Pages อัตโนมัติทุกครั้งที่ push (ฟรี 100% ไม่มี build step)
+# ใช้ได้ทันที: Settings -> Pages -> Source = "GitHub Actions"
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # กันไฟล์ที่ไม่ควรถูกเผยแพร่ (โค้ด Python เดิม/ใบรับรอง) แม้จะถูก .gitignore ไว้แล้วก็ตาม
+      - name: Remove non-public files
+        run: rm -rf legacy __pycache__ .freebuff *.pem
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .   # static site ล้วน ไม่มี build
+      - id: deployment
+        uses: actions/deploy-pages@v4

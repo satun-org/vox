@@ -1,0 +1,12 @@
+# โค้ด Python เดิม + ใบรับรอง self-signed (มี private key) — ห้ามขึ้น GitHub
+legacy/
+__pycache__/
+*.pyc
+*.pem
+
+# ไฟล์ภายในของ Freebuff
+.freebuff/
+
+# ทั่วไป
+.DS_Store
+node_modules/
