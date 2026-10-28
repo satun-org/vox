@@ -88,6 +88,18 @@ const dom = {
   qrCanvas: document.getElementById('qrCanvas'),
   qrUrlText: document.getElementById('qrUrlText'),
 
+  modeChip: document.getElementById('modeChip'),
+  modeChipDot: document.getElementById('modeChipDot'),
+  modeChipText: document.getElementById('modeChipText'),
+  modeModal: document.getElementById('modeModal'),
+  btnCloseMode: document.getElementById('btnCloseMode'),
+  modeCurrentTitle: document.getElementById('modeCurrentTitle'),
+  modeCurrentDesc: document.getElementById('modeCurrentDesc'),
+  modeConnStatus: document.getElementById('modeConnStatus'),
+  btnModeOnline: document.getElementById('btnModeOnline'),
+  btnModeLan: document.getElementById('btnModeLan'),
+  btnModeAuto: document.getElementById('btnModeAuto'),
+
   toast: document.getElementById('toast'),
   remoteAudios: document.getElementById('remoteAudios')
 };
@@ -219,6 +231,47 @@ function refreshRoomUi() {
 
 let signalingStarted = false;
 
+// ---- โหมดสัญญาณ: แสดงบน chip ใน channel bar + modal สลับโหมด ----
+// renderModeUi ถูกเรียกจาก status handler และจากปุ่มใน modeModal
+let lastLinkStatus = null;
+
+function renderModeUi() {
+  if (!dom.modeChip) return;
+  const mode = VOX.mode;          // 'lan' | 'mqtt'
+  const forced = VOX.modeForced;  // ผู้ใช้บังคับเองหรือเปล่า
+  const st = lastLinkStatus;
+
+  // chip: ข้อความ = โหมดที่ใช้อยู่, สีจุด = สถานะเชื่อมต่อ
+  dom.modeChipText.textContent = mode === 'lan' ? '📡 LAN' : '🌐 ONLINE';
+  if (!st || st.state === 'connected') {
+    dom.modeChipDot.style.backgroundColor = 'var(--color-green)';
+  } else if (st.state === 'connecting' || st.state === 'reconnecting') {
+    dom.modeChipDot.style.backgroundColor = 'var(--color-yellow)';
+  } else {
+    dom.modeChipDot.style.backgroundColor = 'var(--color-red)';
+  }
+  dom.modeChip.title = `${mode === 'lan' ? 'ระบบสำรอง LAN' : 'ระบบออนไลน์'} — `
+    + `${st ? (st.label || st.state) : 'ยังไม่ได้เชื่อมต่อ'} (แตะเพื่อสลับระบบ)`;
+
+  // เนื้อหาใน modal
+  if (mode === 'lan') {
+    dom.modeCurrentTitle.textContent = '📡 ระบบสำรอง LAN (ในวงเดียวกัน)';
+    dom.modeCurrentDesc.textContent = 'คุยกับเซิร์ฟเวอร์ lan_server.py บนเครื่องในวง Wi-Fi เดียวกัน '
+      + 'ไม่ต้องพึ่งอินเทอร์เน็ตเลย — เหมาะตอนเน็ตล่มหรืออยู่พื้นที่ห่างไกล ทุกเครื่องต้องเปิด URL เดียวกัน';
+  } else {
+    dom.modeCurrentTitle.textContent = '🌐 ระบบออนไลน์ (อินเทอร์เน็ต)';
+    dom.modeCurrentDesc.textContent = 'คุยกับ broker สาธารณะบนอินเทอร์เน็ต '
+      + 'ใช้ได้ทุกที่ทุกเครือข่าย แต่ต้องมีเน็ตเท่านั้น';
+  }
+
+  dom.modeConnStatus.textContent = `สถานะ: ${st ? (st.label || st.state) : 'ยังไม่ได้เชื่อมต่อ'}`
+    + (forced ? ' • บังคับด้วยมือ' : ' • อัตโนมัติตาม URL');
+
+  dom.btnModeOnline.disabled = mode === 'mqtt';
+  dom.btnModeLan.disabled = mode === 'lan';
+  dom.btnModeAuto.disabled = !forced;
+}
+
 function connectSignaling() {
   if (signalingStarted) return; // กันผูก handler ซ้ำถ้ากดปุ่มเริ่มต้นใช้งานเร็วกว่าที่ modal จะปิด
   signalingStarted = true;
@@ -239,6 +292,8 @@ function connectSignaling() {
       badge.style.boxShadow = '0 0 8px var(--color-red)';
       badge.title = 'ขาดการเชื่อมต่อสัญญาณ';
     }
+    lastLinkStatus = s;
+    renderModeUi();
   });
 
   VOX.on('user_list', (msg) => {
@@ -886,6 +941,34 @@ function setupEventListeners() {
     dom.btnCloseQr.addEventListener('click', () => {
       dom.qrModal.classList.remove('open');
     });
+  }
+
+  // ---- โหมดสัญญาณ: แสดงสถานะ + ปุ่มสลับเอง (ระบบออนไลน์ <-> ระบบสำรอง LAN) ----
+  if (dom.modeChip) {
+    dom.modeChip.addEventListener('click', () => {
+      renderModeUi();
+      dom.modeModal.classList.add('open');
+    });
+
+    dom.btnCloseMode.addEventListener('click', () => {
+      dom.modeModal.classList.remove('open');
+    });
+
+    const switchMode = (m) => {
+      VOX.setMode(m);
+      renderModeUi();
+      dom.modeModal.classList.remove('open');
+      showToast(
+        m === 'lan' ? 'สลับเป็นระบบสำรอง LAN แล้ว'
+          : m === 'mqtt' ? 'สลับเป็นระบบออนไลน์แล้ว'
+            : 'กลับเป็นโหมดอัตโนมัติตาม URL แล้ว'
+      );
+    };
+
+    dom.btnModeOnline.addEventListener('click', () => switchMode('mqtt'));
+    dom.btnModeLan.addEventListener('click', () => switchMode('lan'));
+    dom.btnModeAuto.addEventListener('click', () => switchMode('auto'));
+    renderModeUi(); // แสดงโหมดที่คาดไว้ตั้งแต่ก่อนเชื่อมต่อ
   }
 
   dom.channelModal.querySelectorAll('button[data-chan]').forEach(btn => {

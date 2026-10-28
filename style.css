@@ -135,6 +135,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 10px 18px;
   background: rgba(17, 24, 39, 0.7);
   backdrop-filter: blur(8px);
@@ -178,6 +179,88 @@ body {
   width: 14px;
   height: 14px;
   fill: var(--color-green);
+}
+
+/* Signaling mode chip (บอกว่าตอนนี้ใช้ ระบบออนไลน์ หรือ ระบบสำรอง LAN) */
+.mode-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 6px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mode-chip:active {
+  transform: scale(0.97);
+}
+
+.mode-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-yellow);
+  flex-shrink: 0;
+}
+
+/* Mode modal */
+.mode-current {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.mode-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin-bottom: 14px;
+}
+
+.mode-status {
+  font-size: 0.82rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 4px;
+}
+
+.btn-primary.mode-alt {
+  background: var(--color-blue, #3b82f6);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.mode-note {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 16px;
+  text-align: center;
+  line-height: 1.5;
 }
 
 /* Transmission Status Alert Banner */

@@ -58,6 +58,10 @@
         <span class="channel-name" id="currentChannelLabel">CH-1 ALPHA</span>
         <svg style="width:14px;height:14px;fill:#9ca3af;" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
       </div>
+      <button class="mode-chip" id="modeChip" title="โหมดสัญญาณ — แตะเพื่อสลับระบบ">
+        <span class="mode-chip-dot" id="modeChipDot"></span>
+        <span id="modeChipText">…</span>
+      </button>
       <div class="users-count" id="onlineCountContainer">
         <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
         <span id="onlineCountText">1 ออนไลน์</span>
@@ -201,6 +205,28 @@
       <div style="font-family:monospace; font-size:0.85rem; background:var(--bg-card); padding:10px 14px; border-radius:8px; border:1px solid var(--border-color); word-break:break-all;" id="qrUrlText">
         https://...
       </div>
+    </div>
+  </div>
+
+  <!-- Signaling Mode Modal (เลือกระบบออนไลน์ / ระบบสำรอง LAN ด้วยมือ) -->
+  <div class="modal-overlay" id="modeModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">📡 โหมดสัญญาณ</div>
+        <button class="btn-icon" id="btnCloseMode">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+
+      <div class="mode-current" id="modeCurrentTitle">—</div>
+      <p class="mode-desc" id="modeCurrentDesc">—</p>
+      <div class="mode-status" id="modeConnStatus">สถานะ: …</div>
+
+      <button class="btn-primary" id="btnModeOnline">🌐 ใช้ระบบออนไลน์ (ต้องมีอินเทอร์เน็ต)</button>
+      <button class="btn-primary mode-alt" id="btnModeLan">📡 ใช้ระบบสำรอง LAN (ไม่ต้องมีเน็ต)</button>
+      <button class="btn-ghost" id="btnModeAuto">↺ กลับเป็นอัตโนมัติตาม URL ที่เปิด</button>
+
+      <p class="mode-note" id="modeNote">ทุกคนต้องอยู่โหมดเดียวกันจึงจะเห็นกันในรายชื่อ</p>
     </div>
   </div>
 

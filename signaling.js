@@ -610,17 +610,56 @@ const VOX = (() => {
   let forceMqtt = false;     // ลอง LAN แล้วไม่สำเร็จ -> ถอยไปใช้ broker สาธารณะ
   let localFailures = 0;
 
+  // การบังคับโหมดด้วยมือ (ปุ่ม "โหมดสัญญาณ" ใน UI) — เก็บลง localStorage เพื่อให้จำไว้ข้าม reload
+  const MODE_KEY = 'vox_sig_mode';            // 'lan' | 'mqtt' | null (อัตโนมัติตาม URL)
+  let modeOverride = (() => {
+    try {
+      const v = localStorage.getItem(MODE_KEY);
+      return v === 'lan' || v === 'mqtt' ? v : null;
+    } catch (e) { return null; }
+  })();
+
   function useLocalSignaling() {
-    if (forceMqtt || typeof location === 'undefined' || !location.host) return false;
+    if (typeof location === 'undefined' || !location.host) return false;
     const q = new URLSearchParams(location.search);
     if (q.get('sig') === 'mqtt') return false;   // บังคับใช้ broker สาธารณะ
     if (q.get('sig') === 'lan') return true;     // บังคับใช้ LAN
+    if (modeOverride === 'lan') return true;     // ผู้ใช้บังคับเอง (สำคัญกว่าการเดาจาก URL)
+    if (modeOverride === 'mqtt') return false;
+    if (forceMqtt) return false;                 // LAN ใช้ไม่ได้ -> ถอยไป broker สาธารณะ
     if (location.protocol === 'file:') return false; // เปิดไฟล์ตรงๆ -> เหมือนเดิม
     const h = (location.hostname || '').toLowerCase();
     if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]') return true;
     if (h.endsWith('.local')) return true;
     if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h)) return true;
     return !/\.github\.io$/.test(h); // ที่อื่นที่ไม่ใช่ GitHub Pages = เซิร์ฟเวอร์ LAN ของเรา
+  }
+
+  function currentMode() { return useLocalSignaling() ? 'lan' : 'mqtt'; }
+
+  /**
+   * สลับโหมดสัญญาณด้วยมือ: 'lan' | 'mqtt' | 'auto'
+   * - บันทึกเป็นค่าถาวร (localStorage) เพื่อให้จำไว้หลังรีเฟรช
+   * - สลับ connection ใหม่ทันทีโดย "คงห้อง/ช่องเดิมไว้" (reconnect แล้ว subscribe + announce ใหม่เอง)
+   */
+  function setMode(mode) {
+    modeOverride = mode === 'lan' || mode === 'mqtt' ? mode : null;
+    try {
+      if (modeOverride) localStorage.setItem(MODE_KEY, modeOverride);
+      else localStorage.removeItem(MODE_KEY);
+    } catch (e) { /* noop */ }
+
+    // รีเซ็ตตัวนับทั้งหมด เพื่อให้เริ่มตัดสินใจเรื่องโหมดใหม่ตั้งแต่ต้น
+    forceMqtt = false;
+    localFailures = 0;
+    brokerFailures = 0;
+    brokerIndex = 0;
+    retryDelay = 1000;
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+
+    if (client) restartClient();   // ต่อใหม่ทันทีด้วยโหมดใหม่ (session ยังอยู่)
+    // ถ้ายังไม่เคย connect() -> โหมดใหม่จะถูกใช้ตอน connect() เอง
+    return currentMode();
   }
 
   function brokerName() {
@@ -913,9 +952,12 @@ const VOX = (() => {
   return {
     connect, disconnect, join, leave,
     sendSignal, requestPttStart, requestPttStop, updateName,
+    setMode,
     on,
     get connected() { return connected; },
     get channel() { return session ? session.channel : null; },
+    get mode() { return currentMode(); },
+    get modeForced() { return !!modeOverride; },
     get lanMode() { return useLocalSignaling(); }
   };
 })();
